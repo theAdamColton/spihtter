@@ -1,0 +1,12 @@
+{
+	  "hidden_size": 256,
+	  "intermediate_size": 768,
+	  "initializer_range": 0.02,
+	  "num_attention_heads": 8,
+          "num_hidden_layers": 10,
+	  "vocab_size": 32,
+	  "tie_word_embeddings": false,
+	  "use_cache": true,
+	  "rope_theta": 500000,
+	  "max_position_embeddings": 8192
+}

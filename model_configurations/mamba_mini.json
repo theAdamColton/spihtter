@@ -1,0 +1,5 @@
+{
+  "d_model": 32,
+  "n_layer": 2,
+  "vocab_size": 32
+}

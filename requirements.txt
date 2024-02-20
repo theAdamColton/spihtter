@@ -1,0 +1,9 @@
+datasets==2.17.1
+matplotlib==3.7.2
+numpy==1.26.4
+Pillow==10.2.0
+tokenizers==0.15.2
+torch==2.3.0
+tqdm==4.66.2
+transformers==4.37.2
+spiht @ git+https://github.com/theAdamColton/spiht-py@v0.1.0

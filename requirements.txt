@@ -1,9 +1,19 @@
+braceexpand==0.1.7
+dask==2024.2.0
 datasets==2.17.1
-matplotlib==3.7.2
+diffusers==0.26.3
+einops==0.7.0
+einx==0.1.3
+imageio==2.34.0
+jsonargparse==4.27.5
+accelerate==0.27.2
+matplotlib==3.8.3
 numpy==1.26.4
 Pillow==10.2.0
 tokenizers==0.15.2
-torch==2.3.0
+torch==2.2.0
+torchvision==0.17.0
 tqdm==4.66.2
 transformers==4.37.2
-spiht @ git+https://github.com/theAdamColton/spiht-py@v0.1.0
+webdataset==0.2.86
+spiht @ git+https://github.com/theAdamColton/spiht

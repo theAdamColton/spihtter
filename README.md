@@ -1,5 +1,7 @@
 # Spihtter
 
+See [my article](https://theadamcolton.github.io/generative-modelling-of-compressed-image-file-bits)
+
 Trains autoregressive models to predict the bits of an encoded image file
 
 Currently only works well with mnist and llama. Mamba is a WIP

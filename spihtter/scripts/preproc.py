@@ -176,9 +176,10 @@ def main(
     shard_path: str = None,
     output_path: str = None,
     start_cluster: bool = False,
+    cluster_workers: int = 1,
 ):
     if start_cluster:
-        cluster = dask.distributed.LocalCluster(n_workers=1, threads_per_worker=1)
+        cluster = dask.distributed.LocalCluster(n_workers=cluster_workers, threads_per_worker=1, processes=True)
         client = cluster.get_client()
 
     shards = list(braceexpand.braceexpand(shard_path))

@@ -16,7 +16,7 @@ def main(
         dataset_path:str="mnist", # hf dataset path or wds dataset path
         image_column_name:str = "image",
         max_samples: int = 10,
-        max_seq_len:int=512,
+        max_seq_len:int=8192,
         use_vae: bool = False,
         vae_path: str = "stabilityai/sd-vae-ft-mse",  # or "madebyollin/sdxl-vae-fp16-fix"
         device: str = "cpu",

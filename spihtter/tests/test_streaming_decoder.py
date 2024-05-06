@@ -5,7 +5,7 @@ import numpy as np
 import spiht
 from spiht import SpihtSettings
 
-from ..utils import bytes_to_bits, imshow
+from ..utils import bytes_to_bits
 
 from ..spiht_streaming_decoder import (
     streaming_decode,
@@ -76,19 +76,9 @@ class TestDecShapes(unittest.TestCase):
             if length_difference > 0:
                 spiht_metadata_0 = spiht_metadata_0[:-length_difference]
 
-            def _wo_pos(x):
-                return np.concatenate((x[:, 0][..., None], x[:, 3:]), -1)
-
-            spiht_metadata_without_pos = _wo_pos(spiht_metadata)
-            spiht_metadata_0_without_pos = _wo_pos(spiht_metadata_0)
             self.assertTrue(
-                np.array_equal(spiht_metadata_without_pos, spiht_metadata_0_without_pos)
-            )
-
-            self.assertTrue(
-                np.allclose(
-                    spiht_metadata[:, 1:3],
-                    spiht_metadata_0[:, 1:3],
-                    atol=4,
+                np.array_equal(
+                    spiht_metadata,
+                    spiht_metadata_0,
                 )
             )

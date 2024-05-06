@@ -1,3 +1,4 @@
+import torch
 from transformers import (
     Trainer,
     TrainingArguments,
@@ -59,6 +60,8 @@ def main(config: LaunchConfig):
     )
 
     model = get_model(model_config)
+
+    model = model.to(torch.float16)
 
     # gets rid of the keys that start with _
     train_args = {k: v for k, v in config.train.items() if not k.startswith("_")}

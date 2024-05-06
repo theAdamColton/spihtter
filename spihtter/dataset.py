@@ -1,9 +1,6 @@
-from PIL import Image
 from dataclasses import dataclass
 from typing import Optional
-import torch
 import numpy as np
-from torch import nn
 from torchvision import transforms
 import webdataset as wds
 import spiht
@@ -109,7 +106,6 @@ class DatasetArgs:
     image_column_name: str = "jpg"
     cls_column_name: str = "cls"
     max_seq_len: int = 4096
-    max_size: Optional[int] = None
     min_res: Optional[int] = None
     image_decoding_mode: str = "rgb8"
 
@@ -124,7 +120,6 @@ def get_dataset(args: DatasetArgs, input_processor: SpihtInputProcessor):
     dataset = args.dataset
     image_column_name = args.image_column_name
     max_seq_len = args.max_seq_len
-    max_size = args.max_size
     min_res = args.min_res
     handler = wds.handlers.reraise_exception
 
@@ -140,8 +135,6 @@ def get_dataset(args: DatasetArgs, input_processor: SpihtInputProcessor):
         )
         if min_res:
             ds = ds.select(FilterMinRes(min_res))
-        if max_size:
-            ds = ds.map_dict(pixel_values=ResizeToMax(max_size), handler=handler)
 
         ds = ds.map(
             _SpihtImagePreprocessor(
@@ -180,18 +173,10 @@ def resize_to_max(pixel_values, max_res):
     return pixel_values
 
 
-class ResizeToMax(nn.Module):
-    def __init__(self, max_res):
-        self.max_res = max_res
-
-    def __call__(self, pixel_values):
-        pixel_values = resize_to_max(pixel_values, self.max_res)
-        return pixel_values
-
-
 class FilterMinRes:
     def __init__(self, min_res: int):
         self.min_res = min_res
 
     def __call__(self, row):
-        return min(row["pixel_values"].shape[1:]) >= self.min_res
+        h, w = row["pixel_values"].shape[:-1]
+        return min(h, w) >= self.min_res

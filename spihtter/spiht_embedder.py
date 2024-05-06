@@ -4,7 +4,7 @@ context about the internal state of the Spiht algorithm. The input to this
 network is a matrix of Spiht metadata tokens. This metadata matrix can be
 obtained using the spiht streaming decoder, or the spiht.decode_image function.
 """
-import math
+
 import torch
 from torch import nn
 
@@ -18,78 +18,6 @@ def unpackbits_pt(x, num_bits):
     return (x & mask).to(torch.bool).reshape(*xshape, num_bits)
 
 
-class CAPE2d(nn.Module):
-    """
-    https://arxiv.org/abs/2106.03143
-    2021
-    CAPE: Encoding Relative Positions with Continuous Augmented Positional Embeddings
-
-    some code from https://github.com/gcambara/cape
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        max_global_shift: float = 0.01,
-        max_local_shift: float = 0.0,
-        max_global_scaling: float = 1.0,
-    ):
-        super().__init__()
-
-        assert (
-            d_model % 2 == 0
-        ), f"""The number of channels should be even,
-                                     but it is odd! # channels = {d_model}."""
-
-        self.max_global_shift = max_global_shift
-        self.max_local_shift = max_local_shift
-        self.max_global_scaling = max_global_scaling
-
-        half_channels = d_model // 2
-        rho = 10 ** torch.linspace(0, 1, half_channels)
-        w_x = rho * torch.cos(torch.arange(half_channels))
-        w_y = rho * torch.sin(torch.arange(half_channels))
-        self.register_buffer("w_x", w_x)
-        self.register_buffer("w_y", w_y)
-
-    def forward(self, x, y):
-        return self.compute_pos_emb(x, y)
-
-    def compute_pos_emb(self, x, y):
-        """
-        x: batched tensor of relative x positions, from -1 to 1
-        y: batched tensor of relative y positions, from -1 to 1
-        """
-        x, y = self.augment_positions(x, y)
-
-        phase = torch.pi * (self.w_x * x.unsqueeze(-1) + self.w_y * y.unsqueeze(-1))
-        pos_emb = torch.concatenate([torch.cos(phase), torch.sin(phase)], axis=-1)
-
-        return pos_emb
-
-    def augment_positions(self, x, y):
-        if self.training:
-            if self.max_global_shift:
-                x = x + torch.empty_like(x).uniform_(
-                    -self.max_global_shift, self.max_global_shift
-                )
-
-                y = y + torch.empty_like(y).uniform_(
-                    -self.max_global_shift, self.max_global_shift
-                )
-
-            if self.max_local_shift:
-                raise NotImplementedError()
-
-            if self.max_global_scaling > 1.0:
-                log_l = math.log(self.max_global_scaling)
-                lambdas = torch.exp(torch.empty_like(x).uniform_(-log_l, log_l))
-                x *= lambdas
-                y *= lambdas
-
-        return x, y
-
-
 class SpihtEmbedder(nn.Module):
     def __init__(
         self,
@@ -97,6 +25,8 @@ class SpihtEmbedder(nn.Module):
         action_size=8,
         max_dwt_depth=12,
         dwt_channels=3,
+        max_height=128,
+        max_width=128,
     ):
         """
         Args:
@@ -118,23 +48,21 @@ class SpihtEmbedder(nn.Module):
         self.max_dwt_depth = max_dwt_depth
         self.dwt_channels = dwt_channels
 
-        emb_dim = dim
-
-        # TODO uses simple absolute pos embeddings
-        self.pos_emb = CAPE2d(emb_dim)
+        self.pos_embed_height = nn.Embedding(max_height, dim)
+        self.pos_embed_width = nn.Embedding(max_width, dim)
         self.pos_scale = nn.Parameter(torch.Tensor([1 / self.dim**0.5]))
 
-        self.dwt_depth_embed = nn.Embedding(max_dwt_depth, emb_dim)
-        self.dwt_channel_embed = nn.Embedding(dwt_channels, emb_dim)
+        self.dwt_depth_embed = nn.Embedding(max_dwt_depth, dim)
+        self.dwt_channel_embed = nn.Embedding(dwt_channels, dim)
         # ll, da, ad, 'dd'
-        self.dwt_filter_embed = nn.Embedding(4, emb_dim)
-        self.action_embed = nn.Embedding(action_size, emb_dim)
+        self.dwt_filter_embed = nn.Embedding(4, dim)
+        self.action_embed = nn.Embedding(action_size, dim)
 
-        self.n_emb = nn.Embedding(2**4, emb_dim)
+        self.n_emb = nn.Embedding(2**4, dim)
 
         # input features are 16 bits of the input int16
         self.rec_arr_proj = nn.Sequential(
-            nn.Linear(16, emb_dim, bias=False),
+            nn.Linear(16, dim, bias=False),
         )
 
         self.pad_token = nn.Embedding(1, dim)
@@ -185,9 +113,9 @@ class SpihtEmbedder(nn.Module):
 
         action_emb = self.action_embed(action_ids)
 
-        # scales to -1, 1
-        x_pos, y_pos = height_ids / 100_000, width_ids / 100_000
-        pos_embed = self.pos_emb(x_pos, y_pos) * self.pos_scale
+        pos_embed = (
+            self.pos_emb_height(height_ids) + self.pos_embed_width(width_ids)
+        ) * self.pos_scale
 
         channel_emb = self.dwt_channel_embed(channel_ids)
         filter_emb = self.dwt_filter_embed(filter_ids)

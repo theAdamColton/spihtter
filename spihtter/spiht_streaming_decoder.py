@@ -247,23 +247,18 @@ class CoefficientMetadata:
             ),
         ]
 
-    def get_local_position(self, slices, level):
+    def get_local_index(self, slices, level):
         if self.depth == level:
-            local_h = self.height / slices[0][1].stop
-            local_w = self.width / slices[0][2].stop
+            local_h = self.height
+            local_w = self.width
         else:
             depth_i = level - self.depth
             filter_i = self.filter
             filter_slice = slices[depth_i][index_to_filter(filter_i)]
-            local_h = (self.height - filter_slice[1].start) / (
-                filter_slice[1].stop - filter_slice[1].start
-            )
-            local_w = (self.width - filter_slice[2].start) / (
-                filter_slice[2].stop - filter_slice[2].start
-            )
+            local_h = self.height - filter_slice[1].start
+            local_w = self.width - filter_slice[2].start
 
-        # as an integer from -100_000 to 100_000
-        return local_h * 200_000.0 - 100_000.0, local_w * 200_000.0 - 100_000.0
+        return local_h, local_w
 
 
 def filter_to_index(filter):
@@ -384,7 +379,7 @@ def streaming_decode(
                 yield Array(
                     (
                         0,  # action id
-                        *coefficient.get_local_position(slices, level),  # height, width
+                        *coefficient.get_local_index(slices, level),  # height, width
                         coefficient.channel,  # channel_id
                         coefficient.filter,  # filter_id
                         coefficient.depth,  # depth_id
@@ -399,7 +394,7 @@ def streaming_decode(
                     yield Array(
                         (
                             1,  # action id
-                            *coefficient.get_local_position(
+                            *coefficient.get_local_index(
                                 slices, level
                             ),  # height, width
                             coefficient.channel,  # channel_id
@@ -431,7 +426,7 @@ def streaming_decode(
                     yield Array(
                         (
                             2,  # action id
-                            *coefficient.get_local_position(
+                            *coefficient.get_local_index(
                                 slices, level
                             ),  # height, width
                             coefficient.channel,  # channel_id
@@ -452,7 +447,7 @@ def streaming_decode(
                             yield Array(
                                 (
                                     3,
-                                    *offspring_coeff.get_local_position(
+                                    *offspring_coeff.get_local_index(
                                         slices, level
                                     ),  # height, width
                                     offspring_coeff.channel,  # channel_id
@@ -471,7 +466,7 @@ def streaming_decode(
                                 yield Array(
                                     (
                                         4,  # action id
-                                        *offspring_coeff.get_local_position(
+                                        *offspring_coeff.get_local_index(
                                             slices, level
                                         ),  # height, width
                                         offspring_coeff.channel,  # channel_id
@@ -506,7 +501,7 @@ def streaming_decode(
                     yield Array(
                         (
                             5,  # action id
-                            *coefficient.get_local_position(
+                            *coefficient.get_local_index(
                                 slices, level
                             ),  # height, width
                             coefficient.channel,  # channel_id
@@ -537,7 +532,7 @@ def streaming_decode(
                 yield Array(
                     (
                         6,  # action id
-                        *coefficient.get_local_position(slices, level),  # height, width
+                        *coefficient.get_local_index(slices, level),  # height, width
                         coefficient.channel,  # channel_id
                         coefficient.filter,  # filter_id
                         coefficient.depth,  # depth_id

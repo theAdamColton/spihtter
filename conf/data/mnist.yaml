@@ -1,3 +1,4 @@
+# this is for the tiny 28 x 28 mnist images
 dataset_type: wds-image
 dataset: "datasets/mnist/train/{0..9}.tar"
 image_column_name: webp

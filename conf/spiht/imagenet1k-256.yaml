@@ -1,0 +1,11 @@
+wavelet: bior2.2
+quantization_scale: 150.0
+image_channels: 3
+color_model: Jzazbz
+mode: symmetric
+per_channel_quant_scales:
+  - 8
+  - 1
+  - 1
+format_attrs_as_bits: True
+

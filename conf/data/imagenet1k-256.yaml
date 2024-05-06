@@ -1,0 +1,8 @@
+# This is for imagenet 1k resized to 256
+dataset_type: wds-image
+dataset: "/hdd/imagenet1k-256/imagenet1k-train-{0000..1023}.tar"
+source_url: https://huggingface.co/datasets/adams-story/imagenet1k-256-wds
+image_column_name: jpg
+max_seq_len: 16384
+image_decoding_mode: rgb8
+min_res: 16

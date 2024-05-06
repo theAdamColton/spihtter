@@ -2,6 +2,7 @@
 lauches the preprocessor over a web dataset shard list identified by braces
 {000.100}.tar
 """
+
 from typing import Any
 import dask
 import dask.distributed
@@ -22,15 +23,11 @@ from spihtter.spiht_configuration import get_configuration
 from spihtter.spiht_image import SpihtImage
 from spihtter.utils import imsave
 
-from ..dataset import get_wds_image_dataset, _SpihtImagePreprocessor, _SpihtVaePreprocessor
+from ..dataset import _SpihtImagePreprocessor
 
 
 @dataclass
 class PreprocessArgs:
-    # Use the vae before compressing with spiht
-    use_vae: bool = True
-    # The old VAE works way better for some reason.
-    vae_path: str = "stabilityai/sd-vae-ft-mse"  # or "madebyollin/sdxl-vae-fp16-fix"
     device: str = "cpu"
     dtype: str = "float32"  # or float16
     torch_dtype: Any = field(init=False)
@@ -42,34 +39,11 @@ class PreprocessArgs:
     min_res: int = 128
     resume: bool = True
 
-    spiht_configuration_mode : str = "BaseSpihtConfiguration"
+    spiht_configuration_mode: str = "BaseSpihtConfiguration"
 
     def __post_init__(self):
         self.torch_dtype = getattr(torch, self.dtype)
         self.spiht_configuration = get_configuration(self.spiht_configuration_mode)
-
-
-class VaeProvider(dask.distributed.WorkerPlugin):
-    def __init__(self, args: PreprocessArgs):
-        self.args = args
-
-    @staticmethod
-    def _get_vae(args: PreprocessArgs):
-        dprint("loading vae...")
-        vae = (
-            AutoencoderKL.from_pretrained(args.vae_path)
-            .to(args.torch_dtype)
-            .to(args.device)
-        )
-        return vae
-
-
-    def setup(self, worker):
-        if self.args.use_vae:
-            vae = self._get_vae(self.args)
-        else:
-            vae = None
-        worker._vae = vae
 
 
 def _get_tarfile_basenames(shard):
@@ -90,7 +64,7 @@ def _check_equal_rows(input_shard, output_shard):
     return input_names == output_names
 
 
-def _proc_shard(input_shard, output_shard, args:PreprocessArgs):
+def _proc_shard(input_shard, output_shard, args: PreprocessArgs):
     if args.resume:
         if os.path.exists(output_shard):
             if _check_equal_rows(input_shard, output_shard):
@@ -110,32 +84,22 @@ def _proc_shard(input_shard, output_shard, args:PreprocessArgs):
 
     spiht_configuration = args.spiht_configuration
 
-    vae = get_worker()._vae
-
-    if args.use_vae:
-        ds = ds.map(
-                _SpihtVaePreprocessor(spiht_configuration, max_seq_len=None, bpp=args.bpp, vae=vae)
-                )
-    else:
-        ds = ds.map(
-                _SpihtImagePreprocessor(spiht_configuration,
-                                        max_seq_len=None,
-                                        bpp=args.bpp)
-                )
-
+    ds = ds.map(
+        _SpihtImagePreprocessor(spiht_configuration, max_seq_len=None, bpp=args.bpp)
+    )
 
     worker_id = get_worker().id
 
     with wds.TarWriter(output_shard, compress=True) as tarwriter:
         _tot = 0
         for row in ds:
-            label = row.pop('label')
+            label = row.pop("label")
             if label is not None:
-                row['cls'] = label
+                row["cls"] = label
 
             encoding_result_dict = {}
             other_data = {}
-            for k,v in row.items():
+            for k, v in row.items():
                 if k.startswith("encoding_result_"):
                     encoding_result_dict[k] = v
                 else:
@@ -143,10 +107,7 @@ def _proc_shard(input_shard, output_shard, args:PreprocessArgs):
 
             encoding_result = spiht.EncodingResult.from_dict(encoding_result_dict)
 
-            tarwriter.write({
-                'encoding_result.pyd': encoding_result,
-                **other_data
-            })
+            tarwriter.write({"encoding_result.pyd": encoding_result, **other_data})
 
             _tot += 1
 
@@ -156,13 +117,14 @@ def _proc_shard(input_shard, output_shard, args:PreprocessArgs):
 
 def _dask_preproc_shards(input_shards, output_shards, args: PreprocessArgs):
     client = dask.distributed.get_client()
-    client.register_plugin(VaeProvider(args))
 
     print(f"processing {len(output_shards)} wds shards")
 
     delayed = []
     for input_shard, output_shard in zip(input_shards, output_shards):
-        d = client.submit(_proc_shard, input_shard, output_shard, args, retries=10, pure=False)
+        d = client.submit(
+            _proc_shard, input_shard, output_shard, args, retries=10, pure=False
+        )
         delayed.append(d)
 
     for d in delayed:
@@ -179,7 +141,9 @@ def main(
     cluster_workers: int = 1,
 ):
     if start_cluster:
-        cluster = dask.distributed.LocalCluster(n_workers=cluster_workers, threads_per_worker=1, processes=True)
+        cluster = dask.distributed.LocalCluster(
+            n_workers=cluster_workers, threads_per_worker=1, processes=True
+        )
         client = cluster.get_client()
 
     shards = list(braceexpand.braceexpand(shard_path))

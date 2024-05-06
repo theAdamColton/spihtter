@@ -1,22 +1,18 @@
-import omegaconf
-from dataclasses import dataclass, field
-import os
-from typing import Any
 from transformers import (
     Trainer,
     TrainingArguments,
 )
 import hydra
 import hydra
-from hydra.core.config_store import ConfigStore
 from transformers.training_args import AcceleratorConfig
 
+from .config import LaunchConfig
 from spihtter.model_factory import get_model
 from spihtter.process_inputs import SpihtInputProcessor
 from spihtter.spiht_configuration import SpihtConfiguration
 from spihtter.tokenizer import get_simple_tokenizer
-from spihtter.generation_utils import GenerateImageCallback, GenerateImageConfig
-from spihtter.dataset import DatasetArgs, get_dataset
+from spihtter.generation_utils import GenerateImageCallback
+from spihtter.dataset import get_dataset
 
 
 class AutoRegressiveDecoderTrainer(Trainer):
@@ -24,36 +20,6 @@ class AutoRegressiveDecoderTrainer(Trainer):
         labels = inputs["input_ids"]
         inputs["labels"] = labels
         return super().compute_loss(model, inputs, return_outputs)
-
-
-@dataclass
-class SpihtterTrainingArguments(TrainingArguments):
-    """overrides some fields to make compatible with omegaconf"""
-
-    output_dir: str = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    lr_scheduler_kwargs: Any = None
-    debug: Any = None
-    fsdp: Any = ""
-    fsdp_config: Any = None
-    accelerator_config: Any = None  # = AcceleratorConfig()
-    dispatch_batches: Any = False
-    deepspeed: Any = None
-    report_to: Any = None
-    gradient_checkpointing_kwargs: Any = None
-    optim_target_modules: Any = None
-
-
-@dataclass
-class LaunchConfig:
-    train: SpihtterTrainingArguments = field(default_factory=SpihtterTrainingArguments)
-    data: DatasetArgs = field(default_factory=DatasetArgs)
-    generation: GenerateImageConfig = field(default_factory=GenerateImageConfig)
-    spiht: SpihtConfiguration = field(default_factory=SpihtConfiguration)
-    model: Any = None
-
-
-cs = ConfigStore.instance()
-cs.store(name="base_config", node=LaunchConfig)
 
 
 @hydra.main(version_base=None, config_path="../../conf", config_name="config")

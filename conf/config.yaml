@@ -9,3 +9,6 @@ defaults:
 
 data:
   max_seq_len: 1024
+
+check_dataset:
+  max_samples: 400

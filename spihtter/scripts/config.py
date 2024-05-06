@@ -34,6 +34,7 @@ class LaunchConfig:
     spiht: SpihtConfiguration = field(default_factory=SpihtConfiguration)
     model: Any = None
     check_dataset: Any = None
+    model_dtype: str = ""
 
 
 cs = ConfigStore.instance()

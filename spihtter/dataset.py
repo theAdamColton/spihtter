@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 from typing import Optional
 import numpy as np
@@ -108,6 +109,8 @@ class DatasetArgs:
     max_seq_len: int = 4096
     min_res: Optional[int] = None
     image_decoding_mode: str = "rgb8"
+    seed: int = 42
+    shuffle_size: int = 5000
 
 
 def get_dataset(args: DatasetArgs, input_processor: SpihtInputProcessor):
@@ -129,6 +132,7 @@ def get_dataset(args: DatasetArgs, input_processor: SpihtInputProcessor):
 
         ds = (
             wds.WebDataset(dataset)
+            .shuffle(args.shuffle_size, rng=random.Random(args.seed))
             .decode(args.image_decoding_mode, handler=handler)
             .rename(pixel_values=image_column_name, handler=handler)
             .rename(label=cls_column_name, handler=handler)

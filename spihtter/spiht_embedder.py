@@ -50,12 +50,13 @@ class SpihtEmbedder(nn.Module):
 
         self.pos_embed_height = nn.Embedding(max_height, dim)
         self.pos_embed_width = nn.Embedding(max_width, dim)
-        self.pos_scale = nn.Parameter(torch.Tensor([1 / self.dim**0.5]))
 
         self.dwt_depth_embed = nn.Embedding(max_dwt_depth, dim)
         self.dwt_channel_embed = nn.Embedding(dwt_channels, dim)
+
         # ll, da, ad, 'dd'
         self.dwt_filter_embed = nn.Embedding(4, dim)
+
         self.action_embed = nn.Embedding(action_size, dim)
 
         self.n_emb = nn.Embedding(2**4, dim)
@@ -113,9 +114,7 @@ class SpihtEmbedder(nn.Module):
 
         action_emb = self.action_embed(action_ids)
 
-        pos_embed = (
-            self.pos_emb_height(height_ids) + self.pos_embed_width(width_ids)
-        ) * self.pos_scale
+        pos_embed = self.pos_embed_height(height_ids) + self.pos_embed_width(width_ids)
 
         channel_emb = self.dwt_channel_embed(channel_ids)
         filter_emb = self.dwt_filter_embed(filter_ids)
@@ -142,8 +141,9 @@ class SpihtEmbedder(nn.Module):
             + rec_arr_values_emb
         )
 
-        embed = embed * (~pad_mask).unsqueeze(-1)
-
-        embed = embed + pad_mask.unsqueeze(-1) * self.pad_token.weight[0]
+        embed = (
+            embed * (~pad_mask).unsqueeze(-1)
+            + pad_mask.unsqueeze(-1) * self.pad_token.weight[0]
+        )
 
         return embed

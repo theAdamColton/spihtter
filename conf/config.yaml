@@ -12,3 +12,5 @@ check_dataset:
 
 train:
   run_name: spihtter
+
+model_dtype: bfloat16

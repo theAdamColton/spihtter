@@ -9,13 +9,12 @@ import torch
 from torch import nn
 
 
-def unpackbits_pt(x, num_bits):
+def unpackbits_pt(x, num_bits, mask=None):
     xshape = x.shape
-    x = x.reshape(-1, 1)
-    mask = 2 ** torch.arange(num_bits, dtype=x.dtype, device=x.device).reshape(
-        1, num_bits
-    )
-    return (x & mask).to(torch.bool).reshape(*xshape, num_bits)
+    x = x.view(-1, 1)
+    if mask is not None:
+        mask = 2 ** torch.arange(num_bits, dtype=x.dtype, device=x.device).unsqueeze(0)
+    return (x & mask).to(torch.bool).view(*xshape, num_bits)
 
 
 class SpihtEmbedder(nn.Module):
@@ -68,6 +67,13 @@ class SpihtEmbedder(nn.Module):
 
         self.pad_token = nn.Embedding(1, dim)
 
+        self.rec_arr_num_bits = 16
+
+        self.register_buffer(
+            "unpack_bits_mask",
+            2 ** torch.arange(self.rec_arr_num_bits, dtype=torch.long).unsqueeze(0),
+        )
+
     def forward(
         self,
         metadata_ids: torch.LongTensor = None,
@@ -110,7 +116,7 @@ class SpihtEmbedder(nn.Module):
             depth_ids,
             n_ids,
             rec_arr_values,
-        ) = metadata_ids.movedim(-1, 0)
+        ) = metadata_ids.unbind(-1)
 
         action_emb = self.action_embed(action_ids)
 
@@ -126,7 +132,14 @@ class SpihtEmbedder(nn.Module):
         # each int gets 16 bits
         # all values are assumed to be between -2**15 and 2**15
         rec_arr_values = rec_arr_values + 2**15
-        bits = unpackbits_pt(rec_arr_values, 16).to(self.rec_arr_proj[0].weight.dtype)
+        # the bits of rec_arr_values, as 1. or -1.
+        bits = (
+            unpackbits_pt(rec_arr_values, 16, mask=self.unpack_bits_mask).to(
+                self.rec_arr_proj[0].weight.dtype
+            )
+            * 2
+            - 1
+        )
         rec_arr_values_emb = self.rec_arr_proj(bits)
 
         # adds them all up

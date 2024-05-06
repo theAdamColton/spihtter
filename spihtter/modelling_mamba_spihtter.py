@@ -12,6 +12,7 @@ import einx
 from transformers import PreTrainedModel, TextStreamer
 from transformers.utils import ModelOutput
 
+from spihtter.configuration_mamba_spihtter import MambaSpihtterConfig
 from spihtter.process_inputs import SpihtInputProcessor
 
 from .generation_utils import SpihtGenerationMixin
@@ -411,10 +412,10 @@ class MambaSpihtterOutput(ModelOutput):
 
 
 class MambaSpihtter(SpihtGenerationMixin, PreTrainedModel):
-    config_class = MambaConfig
+    config_class = MambaSpihtterConfig
     supports_gradient_checkpointing = True
 
-    def __init__(self, config: MambaConfig):
+    def __init__(self, config: MambaSpihtterConfig):
         super().__init__(config)
         self.config = config
 
@@ -426,7 +427,12 @@ class MambaSpihtter(SpihtGenerationMixin, PreTrainedModel):
             self.config.d_model, self.config.vocab_size, bias=False
         )
         self.lm_head.weight = self.embedding.weight
-        self.spihtter_embedder = SpihtEmbedder(dim=config.d_model)
+        self.spihtter_embedder = SpihtEmbedder(
+            dim=config.d_model,
+            max_height=config.max_height,
+            max_width=config.max_width,
+            dwt_channels=config.image_channels,
+        )
         self.gradient_checkpointing = False
 
         self.post_init()
@@ -498,18 +504,18 @@ class MambaSpihtter(SpihtGenerationMixin, PreTrainedModel):
                     # attention masking just means that this particular
                     # input_id does not make a change to the mamba cache
                     # TODO this doesn't work and causes generation to produce garbage
-#                    attention_mask_row = (
-#                        attention_mask[:, seq_i].unsqueeze(-1).unsqueeze(-1)
-#                    )
-#                    for i in range(len(mamba_caches)):
-#                        mamba_caches[i] = (
-#                            past_mamba_caches[i][0] * (~attention_mask_row)
-#                            + mamba_caches[i][0] * attention_mask_row,
-#                            past_mamba_caches[i][1] * (~attention_mask_row)
-#                            + mamba_caches[i][1] * attention_mask_row,
-#                        )
-#
-#                past_mamba_caches = _shallow_clone(mamba_caches)
+        #                    attention_mask_row = (
+        #                        attention_mask[:, seq_i].unsqueeze(-1).unsqueeze(-1)
+        #                    )
+        #                    for i in range(len(mamba_caches)):
+        #                        mamba_caches[i] = (
+        #                            past_mamba_caches[i][0] * (~attention_mask_row)
+        #                            + mamba_caches[i][0] * attention_mask_row,
+        #                            past_mamba_caches[i][1] * (~attention_mask_row)
+        #                            + mamba_caches[i][1] * attention_mask_row,
+        #                        )
+        #
+        #                past_mamba_caches = _shallow_clone(mamba_caches)
 
         else:
             x = self.embedding(input_ids)

@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from transformers import LlamaForCausalLM, PreTrainedModel
 
-
+from .configuration_llama_spihtter import LlamaSpihtterConfig
 from .spiht_embedder import SpihtEmbedder
 from .generation_utils import SpihtGenerationMixin
 
@@ -19,11 +19,17 @@ from .generation_utils import SpihtGenerationMixin
 class LlamaSpihtter(SpihtGenerationMixin, PreTrainedModel):
     model_type = "llamaspihtter"
     supports_gradient_checkpointing = True
+    config_class = LlamaSpihtterConfig
 
     def __init__(self, config):
         super().__init__(config)
         self.model = LlamaForCausalLM(config)
-        self.spihtter_embedder = SpihtEmbedder(dim=config.hidden_size)
+        self.spihtter_embedder = SpihtEmbedder(
+            dim=config.hidden_size,
+            max_height=config.max_height,
+            max_width=config.max_width,
+            dwt_channels=config.image_channels,
+        )
         self.post_init()
 
     def _init_weights(self, module):

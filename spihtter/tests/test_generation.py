@@ -5,7 +5,7 @@ import torch
 from transformers import LlamaConfig
 
 from spihtter.process_inputs import SpihtInputProcessor
-from spihtter.spiht_configuration import BaseSpihtConfiguration
+from spihtter.spiht_configuration import SpihtConfiguration
 from ..modelling_llama_spihtter import LlamaSpihtter
 from ..tokenizer import get_simple_tokenizer
 
@@ -15,7 +15,7 @@ class Tests(unittest.TestCase):
         tk = get_simple_tokenizer(["0123456789"])
         config = LlamaConfig.from_json_file("./model_configurations/llama_tiny.json")
         model = LlamaSpihtter(config)
-        spiht_config = BaseSpihtConfiguration()
+        spiht_config = SpihtConfiguration()
         input_processor = SpihtInputProcessor(tk, spiht_config)
         return tk, model, input_processor, spiht_config
 

@@ -1,0 +1,11 @@
+wavelet: bior1.1
+quantization_scale: 50.0
+image_channels: 1
+color_model: null
+per_channel_quant_scales: null
+level_fixed: 3
+format_attrs_as_bits: True
+height_width_fixed: 
+  - 28
+  - 28
+

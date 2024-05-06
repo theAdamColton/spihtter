@@ -8,7 +8,7 @@ import spiht
 from spihtter.spiht_image import SpihtImage
 
 from ..utils import bits_to_bytes, imload, bytes_to_bits, imshow, imsave
-from ..spiht_configuration import BaseSpihtConfiguration
+from ..spiht_configuration import SpihtConfiguration
 from ..tokenizer import get_simple_tokenizer
 from ..process_inputs import SpihtInputProcessor
 
@@ -73,6 +73,6 @@ class Tests(unittest.TestCase):
         tk = get_simple_tokenizer(
             [str(i) for i in range(10)] + ["abcdefghijklmnopqrstuvwxyz"]
         )
-        conf = BaseSpihtConfiguration()
+        conf = SpihtConfiguration()
         proc = SpihtInputProcessor(tk, conf, "\x00", "\x01")
         return tk, conf, proc

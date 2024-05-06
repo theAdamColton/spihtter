@@ -5,29 +5,21 @@ that are used to encode/decode images to bits
 
 All configuration classes follow a naming pattern ending with the suffix 'SpihtConfiguration'
 """
+
 import math
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 from dataclasses import dataclass
-import sys
 
 from spiht import SpihtSettings
 
 from spihtter.utils import bits_to_int, int_to_bits
 
 
-def get_configuration(name:str, **kwargs):
-    curr_module =  sys.modules[__name__]
-    names = [s for s in dir(curr_module) if s.endswith("SpihtConfiguration")]
-    if name in names:
-        config_class = getattr(curr_module, name)
-        return config_class(**kwargs)
-    raise ValueError(f"config name {name} doesn't exist! Available config names are {names}")
-
-
 @dataclass
-class BaseSpihtConfiguration:
+class SpihtConfiguration:
     """
     This class contains the configuration used by the spiht algorithm
+     and the configuration used to format the spiht parameters as html attrs
 
     The spiht algorithm doesn't require a set-in-stone number of channels, or
     number of levels. This class stores the settings required to specify and
@@ -36,19 +28,30 @@ class BaseSpihtConfiguration:
     The default settings are designed to work well for natural, RGB colored
     images.
 
-    The height and width can also be expressed as hardcoded numbers
+    The height and width can also be expressed as hardcoded numbers using `height_width_fixed`
+
+    The level can be specified as a fixed value using `level_fixed`
     """
 
     wavelet: str = "bior2.2"
     quantization_scale: float = 150.0
     color_model: Optional[str] = "Jzazbz"
     mode: str = "symmetric"
+    level_fixed: Optional[int] = None
+    format_attrs_as_bits: bool = False
+    height_width_fixed: Optional[Tuple[int, int]] = None
     per_channel_quant_scales: Optional[Tuple[float, float, float]] = (8, 1, 1)
     image_channels: int = 3
-    height: Optional[int] = None
-    width: Optional[int] = None
+    off_bit_token: str = "\x00"
+    on_bit_token: str = "\x01"
 
     def spiht_tag_attr_keys(self):
+        """
+        returns a list of the attribute keys that must appear in the spiht html
+        """
+        if self.height_width_fixed:
+            return ["n"]
+
         return ["h", "w", "n"]
 
     def format_spiht_tag_attrs(self, attrs: dict):
@@ -65,21 +68,30 @@ class BaseSpihtConfiguration:
         """
         parses integers from the attrs dict
         """
-        return {
+        d = {
             k: self.parse_spiht_attr_number(attrs[k])
             for k in self.spiht_tag_attr_keys()
         }
+
+        if self.height_width_fixed:
+            d["h"], d["w"] = self.height_width_fixed
+
+        return d
 
     def parse_spiht_attr_number(self, x: str):
         """
         This determines how number attributes in the spiht html tag are parsed
         """
+        if self.format_attrs_as_bits:
+            return bits_to_int(x)
         return int(x)
 
     def format_spiht_attr_number(self, x: int):
         """
         This determines how number attributes in the spiht html tag are formatted
         """
+        if self.format_attrs_as_bits:
+            return int_to_bits(x)
         return str(x)
 
     def get_level(self, h: int, w: int):
@@ -94,6 +106,9 @@ class BaseSpihtConfiguration:
         It also theoretically removes some of the spacial bias that can harm
         auto-regressive models.
         """
+        if self.level_fixed is not None:
+            return self.level_fixed
+
         return math.floor(min(math.log2(h / 4), math.log2(w / 4)))
 
     def __post_init__(self):
@@ -104,116 +119,3 @@ class BaseSpihtConfiguration:
             color_model=self.color_model,
             per_channel_quant_scales=self.per_channel_quant_scales,
         )
-
-
-@dataclass
-class MnistSpihtConfiguration(BaseSpihtConfiguration):
-    """
-    Mnist images are 28 by 28 and have only one channel.
-
-    You can save a lot of bits and improve reconstruction quality by using
-    special settings.
-    """
-
-    wavelet: str = "bior1.1"
-    quantization_scale: float = 50.0
-    color_model: Optional[str] = None
-    per_channel_quant_scales: Optional[Tuple[float, float, float]] = None
-    image_channels: int = 1
-
-    def spiht_tag_attr_keys(self):
-        return ["n"]
-
-    def parse_spiht_tag_attrs(self, attrs: dict):
-        attrs = super().parse_spiht_tag_attrs(attrs)
-        attrs["h"] = 28
-        attrs["w"] = 28
-        return attrs
-
-    def get_level(self, h, w):
-        return 3
-
-    def parse_spiht_attr_number(self, x: str):
-        """
-        This determines how number attributes in the spiht html tag are parsed
-        """
-        return bits_to_int(x)
-
-    def format_spiht_attr_number(self, x: int):
-        """
-        This determines how number attributes in the spiht html tag are formatted
-        """
-        return int_to_bits(x)
-
-
-@dataclass
-class CifarSpihtConfiguration(BaseSpihtConfiguration):
-    quantization_scale: float = 10.0
-    wavelet: str = "bior4.4"
-    color_model: Optional[str] = "IPT"
-    mode: str = "periodization"
-
-    def get_level(self, h: int, w: int):
-        return 4
-
-    def spiht_tag_attr_keys(self):
-        return ["n"]
-
-    def parse_spiht_tag_attrs(self, attrs: dict):
-        attrs = super().parse_spiht_tag_attrs(attrs)
-        attrs["h"] = 32
-        attrs["w"] = 32
-        return attrs
-
-    def parse_spiht_attr_number(self, x: str):
-        """
-        This determines how number attributes in the spiht html tag are parsed
-        """
-        return bits_to_int(x)
-
-    def format_spiht_attr_number(self, x: int):
-        """
-        This determines how number attributes in the spiht html tag are formatted
-        """
-        return int_to_bits(x)
-
-
-@dataclass
-class TinyImagenetSpihtConfiguration(BaseSpihtConfiguration):
-    quantization_scale: float = 20.0
-    wavelet: str = "bior4.4"
-    color_model: Optional[str] = "IPT"
-    mode: str = "periodization"
-
-    def get_level(self, h: int, w: int):
-        return 5
-
-    def spiht_tag_attr_keys(self):
-        return ["n"]
-
-    def parse_spiht_tag_attrs(self, attrs: dict):
-        attrs = super().parse_spiht_tag_attrs(attrs)
-        attrs["h"] = 64
-        attrs["w"] = 64
-        return attrs
-
-    def parse_spiht_attr_number(self, x: str):
-        """
-        This determines how number attributes in the spiht html tag are parsed
-        """
-        return bits_to_int(x)
-
-    def format_spiht_attr_number(self, x: int):
-        """
-        This determines how number attributes in the spiht html tag are formatted
-        """
-        return int_to_bits(x)
-
-
-@dataclass
-class SDVaeSpihtConfiguration(BaseSpihtConfiguration):
-    quantization_scale: float = 50.
-    wavelet: str = "db2"
-    per_channel_quant_scales: Optional[Tuple[float, float, float]] = None
-    image_channels: int = 4
-    color_model: Optional[str] = None

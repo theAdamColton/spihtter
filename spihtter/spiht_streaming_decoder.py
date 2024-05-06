@@ -15,14 +15,14 @@ import pywt
 
 from spiht import SpihtSettings
 
-from .spiht_configuration import BaseSpihtConfiguration
+from .spiht_configuration import SpihtConfiguration
 from .spiht_image import SpihtImage
 
 
 class SpihtStreamingDecoder:
     def __init__(
         self,
-        spiht_configuration: BaseSpihtConfiguration,
+        spiht_configuration: SpihtConfiguration,
         spiht_image: SpihtImage,
         bit_stream,
     ):

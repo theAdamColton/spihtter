@@ -1,5 +1,0 @@
-{
-    "d_model": 512,
-    "n_layer": 16,
-    "vocab_size": 32
-}

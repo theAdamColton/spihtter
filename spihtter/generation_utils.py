@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 import torch
 from typing import Any, Dict, Optional
 
@@ -21,21 +22,27 @@ class DummyTokenizerPBar:
         return ""
 
 
+@dataclass
+class GenerateImageConfig:
+    run_every_steps: int = 100
+    max_length: int = 512
+    output_dir: str = "out/"
+    generation_device: Optional[str] = None
+    prompts: list[str] = field(default_factory=lambda: [])
+
+
 class GenerateImageCallback(TrainerCallback):
     def __init__(
         self,
-        run_every_steps: int = 100,
-        max_length: int = 512,
+        config: GenerateImageConfig,
         spiht_input_processor: SpihtInputProcessor = None,
-        output_dir: str = "out/",
-        generation_device: Optional[str] = None,
-        **generate_kwargs,
+        generate_kwargs={},
     ):
-        self.run_every_steps = run_every_steps
-        self.max_length = max_length
+        self.run_every_steps = config.run_every_steps
+        self.max_length = config.max_length
         self.spiht_input_processor = spiht_input_processor
-        self.output_dir = output_dir
-        self.generation_device = generation_device
+        self.output_dir = config.output_dir
+        self.generation_device = config.generation_device
         self.generate_kwargs = generate_kwargs
 
     def on_step_end(self, args, state, control, model, tokenizer, **kwargs):
@@ -62,9 +69,8 @@ class GenerateImageCallback(TrainerCallback):
             text_streamer = None
 
         generation_kwargs = {
-                k:v.to(model.device)
-                if isinstance(v, torch.Tensor) else v
-                for k,v in self.generate_kwargs.items()
+            k: v.to(model.device) if isinstance(v, torch.Tensor) else v
+            for k, v in self.generate_kwargs.items()
         }
 
         print("GENERATING IMAGE")
@@ -81,9 +87,11 @@ class GenerateImageCallback(TrainerCallback):
 
         prompts = ""
         if tokenizer is not None:
-            print("Section of first sequence generated: ", repr(tokenizer.decode(outputs[0][:40])))
+            print(
+                "Section of first sequence generated: ",
+                repr(tokenizer.decode(outputs[0][:40])),
+            )
             prompts = tokenizer.batch_decode(input_ids)
-
 
         for i, cache in enumerate(past_input_processor_cache):
             image = None
@@ -94,9 +102,10 @@ class GenerateImageCallback(TrainerCallback):
 
             if image is not None:
                 prompt = prompts[i]
+                print("generated image with prompt:", prompt)
                 imsave(
                     image,
-                    f"{self.output_dir}/image-{state.global_step:08}-{slugify(prompt[:20])}.png",
+                    f"{self.output_dir}/step{state.global_step:08}-{slugify(prompt[:20])}.png",
                 )
             else:
                 print(f"Failed to generation image {i}")

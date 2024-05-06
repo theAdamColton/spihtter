@@ -1,10 +1,11 @@
 """
 Convert interleaved texts/images into input_ids and metadata ids.
 """
+
 import numpy as np
 from dataclasses import dataclass
 import torch
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 from html.parser import HTMLParser
 
 
@@ -13,7 +14,7 @@ from transformers import PreTrainedTokenizerFast
 
 from .spiht_streaming_decoder import SpihtExhausted, SpihtStreamingDecoder
 from .spiht_image import SpihtImage
-from .spiht_configuration import BaseSpihtConfiguration
+from .spiht_configuration import SpihtConfiguration
 
 
 class SpihtHTMLParser(HTMLParser):
@@ -74,7 +75,9 @@ class InProgressImage:
                         "Spiht exhausted when attempting to pull metadata. Continuing with padding"
                     )
                 self._exhausted = True
-                metadata.extend([torch.zeros(8, dtype=torch.long)] * (n - len(metadata)))
+                metadata.extend(
+                    [torch.zeros(8, dtype=torch.long)] * (n - len(metadata))
+                )
         return torch.stack(metadata)
 
     def render(self):
@@ -144,21 +147,24 @@ class SpihtInputProcessor:
     def __init__(
         self,
         tokenizer,
-        spiht_configuration: BaseSpihtConfiguration,
-        off_bit_token = "\x00",
-        on_bit_token = "\x01",
+        spiht_configuration: SpihtConfiguration,
     ):
         assert isinstance(tokenizer, PreTrainedTokenizerFast)
         self.tokenizer = tokenizer
         self.spiht_configuration = spiht_configuration
-        self.on_bit_token_id = tokenizer(on_bit_token, add_special_tokens=False).input_ids[-1]
-        self.off_bit_token_id = tokenizer(off_bit_token, add_special_tokens=False).input_ids[-1]
+        on_bit_token = spiht_configuration.on_bit_token
+        off_bit_token = spiht_configuration.off_bit_token
+        self.on_bit_token_id = tokenizer(
+            on_bit_token, add_special_tokens=False
+        ).input_ids[-1]
+        self.off_bit_token_id = tokenizer(
+            off_bit_token, add_special_tokens=False
+        ).input_ids[-1]
         self.on_bit_token = on_bit_token
         self.off_bit_token = off_bit_token
 
         assert tokenizer.decode(self.off_bit_token_id) == off_bit_token
         assert tokenizer.decode(self.on_bit_token_id) == on_bit_token
-
 
     def process_normalized_images_texts(
         self,
@@ -234,7 +240,7 @@ class SpihtInputProcessor:
         # Tokenizers have special logic regarding space characters, when joining tokens
         # We need to correctly decode space characters because the HTML parser
         # is sensitive to them.
-        # So we use a hacky solution to get the tokenizer decoder to 
+        # So we use a hacky solution to get the tokenizer decoder to
         # not remove prefix whitespace
 
         # This only works if the tokenizer uses the metaspace character: ▁
@@ -247,7 +253,7 @@ class SpihtInputProcessor:
             text_tokens.append(tok)
 
         metadata_ids = []
-        _metadata_pad = torch.zeros(8,dtype=torch.long).unsqueeze(0)
+        _metadata_pad = torch.zeros(8, dtype=torch.long).unsqueeze(0)
 
         # at each iteration of this for loop,
         # exactly one row of metadata_ids is appended to metadata_ids

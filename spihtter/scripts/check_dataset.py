@@ -10,18 +10,18 @@ from spihtter.utils import imsave
 
 
 def main(
-        spiht_config_name: str = "MnistSpihtConfiguration",
-        output_dir:str="out",
-        dataset_type:str="hf-image", # or 'wds-image' or 'wds-preprocessed'
-        dataset_path:str="mnist", # hf dataset path or wds dataset path
-        image_column_name:str = "image",
-        max_samples: int = 10,
-        max_seq_len:int=8192,
-        use_vae: bool = False,
-        vae_path: str = "stabilityai/sd-vae-ft-mse",  # or "madebyollin/sdxl-vae-fp16-fix"
-        device: str = "cpu",
-        dtype: str = "float32",  # or float16
-        ):
+    spiht_config_name: str = "MnistSpihtConfiguration",
+    output_dir: str = "out",
+    dataset_type: str = "hf-image",  # or 'wds-image' or 'wds-preprocessed'
+    dataset_path: str = "mnist",  # hf dataset path or wds dataset path
+    image_column_name: str = "image",
+    max_samples: int = 10,
+    max_seq_len: int = 8192,
+    use_vae: bool = False,
+    vae_path: str = "stabilityai/sd-vae-ft-mse",  # or "madebyollin/sdxl-vae-fp16-fix"
+    device: str = "cpu",
+    dtype: str = "float32",  # or float16
+):
 
     spiht_config = get_configuration(spiht_config_name)
 
@@ -33,23 +33,19 @@ def main(
     dataset = get_dataset(
         dataset_type=dataset_type,
         dataset=dataset_path,
-        image_column_name = image_column_name,
-        input_processor =input_processor,
-        max_seq_len =max_seq_len,
-        max_size = max_samples,
+        image_column_name=image_column_name,
+        input_processor=input_processor,
+        max_seq_len=max_seq_len,
+        max_size=max_samples,
     )
 
     torch_dtype = getattr(torch, dtype)
     if use_vae:
-        vae = (
-            AutoencoderKL.from_pretrained(vae_path)
-            .to(torch_dtype)
-            .to(device)
-        )
+        vae = AutoencoderKL.from_pretrained(vae_path).to(torch_dtype).to(device)
 
-    for i,row in enumerate(dataset):
-        input_ids = row['input_ids']
-        spiht_metadata_ids = row['spiht_metadata_ids']
+    for i, row in enumerate(dataset):
+        input_ids = row["input_ids"]
+        spiht_metadata_ids = row["spiht_metadata_ids"]
 
         # take out the start token
         text = tokenizer.decode(input_ids[1:])
@@ -64,10 +60,7 @@ def main(
             with torch.inference_mode():
                 image = (
                     vae.decode(
-                        torch.from_numpy(image)
-                        .to(torch_dtype)
-                        .to(device)
-                        .unsqueeze(0)
+                        torch.from_numpy(image).to(torch_dtype).to(device).unsqueeze(0)
                     )
                     .sample.squeeze(0)
                     .cpu()
@@ -76,10 +69,11 @@ def main(
 
         imsave(image, f"{output_dir}/dataset sample {i:04}.png")
 
-        if i+2 >= max_samples:
+        if i + 2 >= max_samples:
             break
 
 
 if __name__ == "__main__":
     import jsonargparse
+
     dataset = jsonargparse.CLI(main)

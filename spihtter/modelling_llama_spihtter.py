@@ -1,9 +1,10 @@
 """
-This file provides LlamaSpihtter, which is a wrapper around LlamaForCausalLM. 
+LlamaSpihtter is a wrapper around LlamaForCausalLM. 
 
 LlamaSpihtter is the same as LlamaForCausalLM, but uses token embeddings which
 are computed from both the input ids and the spiht embedder.
 """
+
 import torch
 from typing import Optional, List
 import torch
@@ -48,6 +49,7 @@ class LlamaSpihtter(SpihtGenerationMixin, PreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None,
         spiht_metadata_ids: torch.LongTensor = None,
     ):
         if inputs_embeds is None:
@@ -64,6 +66,7 @@ class LlamaSpihtter(SpihtGenerationMixin, PreTrainedModel):
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
+            cache_position=cache_position,
             return_dict=return_dict,
         )
 
@@ -73,12 +76,18 @@ class LlamaSpihtter(SpihtGenerationMixin, PreTrainedModel):
         past_key_values=None,
         attention_mask=None,
         inputs_embeds=None,
+        cache_position=None,
         spiht_input_processor=None,
         past_input_processor_cache=None,
         **kwargs
     ):
         model_inputs = self.model.prepare_inputs_for_generation(
-            input_ids, past_key_values, attention_mask, inputs_embeds, **kwargs
+            input_ids,
+            past_key_values,
+            attention_mask,
+            inputs_embeds,
+            cache_position,
+            **kwargs
         )
         spiht_model_inputs = super().prepare_inputs_for_generation(
             input_ids=model_inputs.pop("input_ids"),

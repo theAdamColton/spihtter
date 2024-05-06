@@ -1,0 +1,18 @@
+warmup_steps: 100
+max_steps: 2000
+logging_steps: 1
+optim: adamw_torch
+learning_rate: 1e-3
+save_total_limit: 1
+lr_scheduler_type: cosine
+weight_decay: 0.1
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_epsilon: 1e-5
+
+
+
+fp16: true
+per_device_train_batch_size: 16
+dataloader_num_workers: 2
+report_to: wandb

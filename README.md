@@ -12,6 +12,13 @@ https://github.com/theAdamColton/spihtter/assets/72479734/e663c78e-a3fb-4607-a35
 
 You will need python>=3.11 as well as a rust compiler. `pip install -r requirements.txt` should do it. You can optionally install mamba from https://github.com/state-spaces/mamba to get access to the fast cuda implementation. This repo has a reference implementation of mamba in pure python/pytorch which is equivalent, but slower.
 
+# download mnist as webdataset tar files
+
+```bash
+mkdir datasets/mnist/; cd mnist
+huggingface-cli download clip-benchmark/wds_mnist --repo-type dataset --local-dir ./ --local-dir-use-symlinks False
+```
+
 # History
 
 v0.0.1 - Mnist digit generation

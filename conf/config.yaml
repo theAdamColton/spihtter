@@ -1,0 +1,11 @@
+defaults:
+  - base_config
+  - model: llama-small
+  - spiht: mnist
+  - data: mnist
+  - train: default
+  - generation: mnist
+  - _self_
+
+data:
+  max_seq_len: 1024

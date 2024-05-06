@@ -1,0 +1,4 @@
+model_type: mamba
+hidden_size: 64
+num_hidden_layers: 8
+vocab_size: 32

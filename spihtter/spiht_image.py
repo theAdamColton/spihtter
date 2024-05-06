@@ -6,7 +6,7 @@ from typing import List, Optional
 import spiht
 from spiht import EncodingResult
 
-from .spiht_configuration import BaseSpihtConfiguration
+from .spiht_configuration import SpihtConfiguration
 from .utils import bits_to_bytes, bytes_to_bits, imload, imshow
 
 
@@ -15,7 +15,7 @@ class SpihtImage:
     height: int
     width: int
     max_n: int
-    spiht_configuration: BaseSpihtConfiguration
+    spiht_configuration: SpihtConfiguration
     _encoded_bytes: Optional[bytes]
     _encoded_bits: Optional[np.ndarray] = None
 
@@ -58,7 +58,7 @@ class SpihtImage:
 
     @staticmethod
     def from_encoding_result(
-        encoding_result: EncodingResult, spiht_configuration: BaseSpihtConfiguration
+        encoding_result: EncodingResult, spiht_configuration: SpihtConfiguration
     ):
         h = encoding_result.h
         w = encoding_result.w
@@ -91,7 +91,7 @@ class SpihtImage:
         return f"<spiht {html_attrs}>"
 
     @staticmethod
-    def from_html_opening_tag_attrs(attrs, spiht_configuration: BaseSpihtConfiguration):
+    def from_html_opening_tag_attrs(attrs, spiht_configuration: SpihtConfiguration):
         attrs = spiht_configuration.parse_spiht_tag_attrs(attrs)
         return SpihtImage(
             height=attrs["h"],
@@ -125,7 +125,7 @@ class SpihtImage:
             return 0
 
     @staticmethod
-    def from_file(file, config: BaseSpihtConfiguration, max_bits=25_000):
+    def from_file(file, config: SpihtConfiguration, max_bits=25_000):
         image = imload(file)
         c, h, w = image.shape
         encoding_result = spiht.encode_image(

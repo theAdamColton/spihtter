@@ -1,28 +1,22 @@
-from dataclasses import dataclass
+import omegaconf
+from dataclasses import dataclass, field
 import os
-from typing import Optional
+from typing import Any
 from transformers import (
-    HfArgumentParser,
-    LlamaConfig,
     Trainer,
     TrainingArguments,
 )
+import hydra
+import hydra
+from hydra.core.config_store import ConfigStore
+from transformers.training_args import AcceleratorConfig
 
-from spihtter.configuration_mamba import MambaConfig
-from spihtter.modelling_llama_spihtter import LlamaSpihtter
-from spihtter.modelling_mamba_spihtter import MambaSpihtter
-from spihtter.process_inputs import InputProcessorCache, SpihtInputProcessor
-from spihtter.spiht_configuration import (
-    CifarSpihtConfiguration,
-    MnistSpihtConfiguration,
-    TinyImagenetSpihtConfiguration,
-    BaseSpihtConfiguration
-)
+from spihtter.model_factory import get_model
+from spihtter.process_inputs import SpihtInputProcessor
+from spihtter.spiht_configuration import SpihtConfiguration
 from spihtter.tokenizer import get_simple_tokenizer
-from spihtter.generation_utils import GenerateImageCallback
-from spihtter.utils import imsave
-from ..dataset import get_dataset, get_hf_image_dataset
-
+from spihtter.generation_utils import GenerateImageCallback, GenerateImageConfig
+from spihtter.dataset import DatasetArgs, get_dataset
 
 
 class AutoRegressiveDecoderTrainer(Trainer):
@@ -33,72 +27,47 @@ class AutoRegressiveDecoderTrainer(Trainer):
 
 
 @dataclass
-class MiscArgs:
-    generate_steps: int = 50
-    max_bits: int = 256
-    model_conf: str = "./model_configurations/llama_tiny.json"
-    generation_device: Optional[str] = None
-    dataset: str = "mnist"
-    dataset_type: str = 'hf-image' # or 'wds-image' or 'wds-preprocessed'
-    image_column_name: str = "image"
+class SpihtterTrainingArguments(TrainingArguments):
+    """overrides some fields to make compatible with omegaconf"""
+
+    output_dir: str = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    lr_scheduler_kwargs: Any = None
+    debug: Any = None
+    fsdp: Any = ""
+    fsdp_config: Any = None
+    accelerator_config: Any = None  # = AcceleratorConfig()
+    dispatch_batches: Any = False
+    deepspeed: Any = None
+    report_to: Any = None
+    gradient_checkpointing_kwargs: Any = None
+    optim_target_modules: Any = None
 
 
-if __name__ == "__main__":
-    train_args, misc_args = HfArgumentParser(
-        (TrainingArguments, MiscArgs)
-    ).parse_args_into_dataclasses()
-    train_args: TrainingArguments
-    misc_args: MiscArgs
-    max_bits = misc_args.max_bits
+@dataclass
+class LaunchConfig:
+    train: SpihtterTrainingArguments = field(default_factory=SpihtterTrainingArguments)
+    data: DatasetArgs = field(default_factory=DatasetArgs)
+    generation: GenerateImageConfig = field(default_factory=GenerateImageConfig)
+    spiht: SpihtConfiguration = field(default_factory=SpihtConfiguration)
+    model: Any = None
 
-    if misc_args.dataset == "mnist":
-        spiht_config = MnistSpihtConfiguration()
-    elif misc_args.dataset.startswith("cifar"):
-        spiht_config = CifarSpihtConfiguration()
-    elif "tiny-imagenet" in misc_args.dataset:
-        spiht_config = TinyImagenetSpihtConfiguration()
-    else:
-        spiht_config = BaseSpihtConfiguration()
+
+cs = ConfigStore.instance()
+cs.store(name="base_config", node=LaunchConfig)
+
+
+@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+def main(config: LaunchConfig):
+    spiht_config = SpihtConfiguration(**config.spiht)
+    model_config = config.model
 
     tokenizer = get_simple_tokenizer()
 
     input_processor = SpihtInputProcessor(tokenizer, spiht_config)
 
-    dataset = get_dataset(
-        dataset=misc_args.dataset, image_column_name=misc_args.image_column_name, max_seq_len=max_bits, input_processor=input_processor, dataset_type=misc_args.dataset_type
-    )
+    dataset = get_dataset(config.data, input_processor)
 
-    os.makedirs(train_args.output_dir, exist_ok=True)
-
-    # initializes image prompts
-    if misc_args.dataset == "mnist":
-        image_prompts = [f"{i}<spiht n=111>" for i in range(10)]
-    else:
-        # initializes image prompts from the start of some dataset items
-        image_prompts = []
-        for i, row in enumerate(dataset):
-            input_ids = row["input_ids"]
-
-            metdata_ids = row["spiht_metadata_ids"]
-            # take out the start token
-            text = tokenizer.decode(input_ids[1:])
-
-            close_tag_index = text.index(">")
-            image_prompt = text[: close_tag_index + 1]
-            image_prompts.append(image_prompt)
-
-            print(repr(image_prompt))
-
-            cache = InputProcessorCache()
-            _, cache = input_processor.process_input_ids_with_cache(
-                input_ids, cache, output_input_processor_cache=True
-            )
-            image = cache.get_last_image()
-
-            imsave(image, f"{train_args.output_dir}/dataset sample {i:04}.png")
-
-            if i + 1 >= 8:
-                break
+    image_prompts = list(config.generation.prompts)
 
     # tokenizes image prompts
     tokenizer.padding_side = "left"
@@ -119,27 +88,19 @@ if __name__ == "__main__":
         )
     )
 
-    if "llama" in misc_args.model_conf:
-        model_conf = LlamaConfig.from_json_file(misc_args.model_conf)
-        model = LlamaSpihtter(model_conf)
-    elif "mamba" in misc_args.model_conf:
-        model_conf = MambaConfig.from_json_file(misc_args.model_conf)
-        model = MambaSpihtter(model_conf)
-    else:
-        raise ValueError(misc_args.model_conf)
-
-    print(
-        f"trainable parameters: {model.num_parameters(only_trainable=True) / 1_000_000:.2f} million"
-    )
-
     generation_callback = GenerateImageCallback(
-        run_every_steps=misc_args.generate_steps,
-        max_length=max_bits,
-        spiht_input_processor=input_processor,
-        generation_device=misc_args.generation_device,
-        output_dir=train_args.output_dir,
-        **generation_inputs,
+        config.generation, input_processor, generation_inputs
     )
+
+    model = get_model(model_config)
+
+    # gets rid of the keys that start with _
+    train_args = {k: v for k, v in config.train.items() if not k.startswith("_")}
+    train_args["accelerator_config"] = AcceleratorConfig(
+        **train_args["accelerator_config"]
+    )
+
+    train_args = TrainingArguments(**train_args)
 
     trainer = AutoRegressiveDecoderTrainer(
         model=model,
@@ -153,3 +114,7 @@ if __name__ == "__main__":
     )
 
     model.save_pretrained(f"{train_args.output_dir}/most_recent/")
+
+
+if __name__ == "__main__":
+    main()

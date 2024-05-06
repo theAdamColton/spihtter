@@ -1,0 +1,6 @@
+dataset_type: wds-image
+dataset: "datasets/mnist/train/{0..9}.tar"
+image_column_name: webp
+source_url: https://huggingface.co/datasets/clip-benchmark/wds_mnist
+max_seq_len: 1024
+image_decoding_mode: l8
